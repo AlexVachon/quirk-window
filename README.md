@@ -42,8 +42,8 @@ window.run(window.open("Follow the mouse", 800, 600), frame)
 |---|---|
 | `window.open(title, w, h, resizable=, hidden=, vsync=, headless=)` | A new `Window` (throws `WindowError` if it can't) |
 | `w.events()` / `w.wait_event(timeout_ms)` | `Event`s: `kind` = `close`, `key_down` / `key_up` (`key`, `shift`, `ctrl`...), `text`, `mouse_move` / `mouse_down` / `mouse_up` (`x`, `y`, `button`), `wheel`, `resize`, `focus`, `blur` |
-| `w.clear`, `rect`, `line`, `point`, `circle`, `text`, `image` | Drawing; `present()` shows the frame |
-| `w.load_image(path)` | A BMP `Image` |
+| `w.clear`, `rect`, `line`, `point`, `circle`, `text`, `image` | Drawing; `present()` shows the frame. `image(img, x, y, width=, height=, src_x=, src_y=, src_w=, src_h=, alpha=)` scales, crops (sprite sheets) and fades |
+| `w.load_image(path)` | An `Image` from PNG (with transparency), JPEG, BMP, GIF (first frame) or TGA |
 | `w.width()`, `height()`, `mouse()`, `key_down(name)`, `set_title`, `close`, `is_open` | Window state |
 | `w.screenshot(path)`, `w.pixel(x, y)` | Read back what was drawn (BMP / 0xRRGGBB) |
 | `window.run(w, frame, fps=60)` | Frame loop |
@@ -57,7 +57,7 @@ from an `async` task. `headless=true` draws off-screen with no display
 
 ## Requirements
 
-- The Quirk compiler 7.20.0+ (its runtime has the `Window_*` functions).
+- The Quirk compiler 7.22.0+ (its runtime has the `Window_*` functions and the image decoder).
 - SDL2, loaded when the first window opens:
   `sudo apt install libsdl2-2.0-0` (Debian / Ubuntu),
   `brew install sdl2` (macOS). `window.available()` checks.
@@ -67,7 +67,7 @@ Bundled with the compiler at `<QUIRK_HOME>/packages/window/`, so
 
 ```bash
 quirk install window            # latest tag from this repo
-quirk install window@1.0.0      # pinned
+quirk install window@1.1.0      # pinned
 ```
 
 ## License

@@ -14,7 +14,9 @@ Colours are Ints: `window.rgb(255, 128, 0)`, `window.rgba(0, 0, 0, 128)`,
 Coordinates are pixels from the top-left corner.
 
 Text uses a built-in 8x16 pixel font (ASCII and Latin-1 accents) —
-`scale=2` doubles it. Images are BMP files (`w.load_image(path)`).
+`scale=2` doubles it. Images: PNG, JPEG, BMP, GIF (first frame) and
+TGA files (`w.load_image(path)`), drawn whole, scaled, faded or a
+rectangle at a time (sprite sheets).
 
 Backed by SDL2, which must be installed (`sudo apt install libsdl2-2.0-0`
 / `brew install sdl2`); `window.available()` checks. Open windows and
@@ -72,7 +74,7 @@ extern define pixel_raw(h: Int, x: Int, y: Int) -> Int
 extern define save_bmp_raw(h: Int, path: String) -> Int
 extern define image_load_raw(h: Int, path: String) -> Int
 extern define image_size_raw(img: Int) -> List
-extern define image_draw_raw(h: Int, img: Int, x: Int, y: Int, w: Int, hh: Int) -> void
+extern define image_draw_raw(h: Int, img: Int, x: Int, y: Int, w: Int, hh: Int, sx: Int, sy: Int, sw: Int, sh: Int, alpha: Int) -> void
 extern define image_free_raw(img: Int) -> void
 
 ---
@@ -264,7 +266,7 @@ define _event(raw: List) -> Event {
 
 // ===== Images =====
 
---- A BMP image loaded for one window (`Window.load_image`). ---
+--- An image loaded for one window (`Window.load_image`); `width` / `height` in pixels. ---
 struct Image {
     width: Int
     height: Int
@@ -412,8 +414,10 @@ struct Window {
     }
 
     ---
-    Load a BMP image to draw in this window.
-    @throws WindowError if it can't be read.
+    Load an image file to draw in this window: PNG (with transparency),
+    JPEG, BMP, GIF (its first frame) or TGA.
+    @throws WindowError if it doesn't exist or can't be decoded.
+    @example logo := w.load_image("assets/logo.png")
     ---
     define load_image(self, path: String) -> Image {
         h := image_load_raw(self._h, path)
@@ -421,9 +425,17 @@ struct Window {
         return Image(h)
     }
 
-    --- Draw `img` with its top-left at (x, y), scaled to width x height (-1 = its own size). ---
-    define image(self, img: Image, x: Int, y: Int, width: Int = -1, height: Int = -1) -> void {
-        image_draw_raw(self._h, img._h, x, y, width, height)
+    ---
+    Draw `img` with its top-left corner at (x, y).
+    @param width, height  scale it to this size (-1 = natural size)
+    @param src_x, src_y, src_w, src_h  draw only this rectangle of the
+           image (a sprite-sheet frame); -1 widths run to the edge
+    @param alpha  opacity, 0 (invisible) to 255 (opaque)
+    @example w.image(logo, 10, 10)
+    @example w.image(sheet, x, y, src_x=frame * 32, src_w=32, src_h=32)
+    ---
+    define image(self, img: Image, x: Int, y: Int, width: Int = -1, height: Int = -1, src_x: Int = 0, src_y: Int = 0, src_w: Int = -1, src_h: Int = -1, alpha: Int = 255) -> void {
+        image_draw_raw(self._h, img._h, x, y, width, height, src_x, src_y, src_w, src_h, alpha)
     }
 
     --- Show everything drawn since the last `present`. ---
