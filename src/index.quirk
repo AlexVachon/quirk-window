@@ -1,0 +1,520 @@
+---
+Windows you draw in: open one (or several), read keyboard / mouse
+events, draw shapes, text and images, and show each frame.
+
+  `window.open(title, width, height)`   — a new `Window`
+  `w.events()`                          — what happened since last time
+  `w.clear(color)`, `w.rect(...)`, `w.line(...)`, `w.circle(...)`,
+  `w.point(...)`, `w.text(...)`, `w.image(...)`
+  `w.present()`                         — show what was drawn
+  `window.run(w, frame)`                — the loop above, at a steady rate
+
+Colours are Ints: `window.rgb(255, 128, 0)`, `window.rgba(0, 0, 0, 128)`,
+`window.hex("#3366ff")`, or a named one (`window.white()`, `red()`, ...).
+Coordinates are pixels from the top-left corner.
+
+Text uses a built-in 8x16 pixel font (ASCII and Latin-1 accents) —
+`scale=2` doubles it. Images are BMP files (`w.load_image(path)`).
+
+Backed by SDL2, which must be installed (`sudo apt install libsdl2-2.0-0`
+/ `brew install sdl2`); `window.available()` checks. Open windows and
+draw from the main program, not from an `async` task.
+
+@example
+use window
+
+w := window.open("Hello", 640, 480)
+x := 0
+while w.is_open() {
+    for e in w.events() {
+        if e.kind == "key_down" and e.key == "escape" { w.close() }
+    }
+    if not w.is_open() { break }
+    w.clear(window.rgb(30, 30, 40))
+    w.rect(x, 200, 80, 80, window.rgb(80, 160, 255))
+    w.text("Hello from Quirk", 20, 20, window.white(), scale=2)
+    w.present()
+    x = (x + 4) % 640
+    window.sleep(16)
+}
+
+@example
+use window
+
+define frame(w: window.Window, events: List) -> void {
+    w.clear(window.black())
+    pos := w.mouse()
+    w.circle(pos.0, pos.1, 20, window.yellow())
+}
+
+window.run(window.open("Follow the mouse", 800, 600), frame)
+---
+from typing.primitives.string use { String }
+from typing.collections.list use { List }
+from typing.exceptions.types use { RuntimeError, ValueError }
+
+extern define available() -> Bool
+extern define error() -> String
+extern define open_raw(title: String, width: Int, height: Int, flags: Int) -> Int
+extern define close_raw(h: Int) -> void
+extern define is_open_raw(h: Int) -> Bool
+extern define next_event_raw(h: Int, timeout_ms: Int) -> List
+extern define clear_raw(h: Int, color: Int) -> void
+extern define rect_raw(h: Int, x: Int, y: Int, w: Int, hh: Int, color: Int, fill: Int) -> void
+extern define line_raw(h: Int, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) -> void
+extern define point_raw(h: Int, x: Int, y: Int, color: Int) -> void
+extern define circle_raw(h: Int, cx: Int, cy: Int, r: Int, color: Int, fill: Int) -> void
+extern define text_raw(h: Int, text: String, x: Int, y: Int, color: Int, scale: Int) -> void
+extern define present_raw(h: Int) -> void
+extern define size_raw(h: Int) -> List
+extern define set_title_raw(h: Int, title: String) -> void
+extern define pixel_raw(h: Int, x: Int, y: Int) -> Int
+extern define save_bmp_raw(h: Int, path: String) -> Int
+extern define image_load_raw(h: Int, path: String) -> Int
+extern define image_size_raw(img: Int) -> List
+extern define image_draw_raw(h: Int, img: Int, x: Int, y: Int, w: Int, hh: Int) -> void
+extern define image_free_raw(img: Int) -> void
+
+---
+Width in pixels of `text` drawn with `Window.text` at `scale` (its
+longest line). For centring and layout.
+@example x := (w.width() - window.text_width("Paused", 2)) / 2
+---
+extern define text_width(text: String, scale: Int = 1) -> Int
+
+--- Milliseconds on a steady clock (for timing frames and animation). ---
+extern define ticks() -> Int
+
+--- Thrown when a window can't be opened (no SDL2, no display, ...). ---
+struct WindowError : RuntimeError {
+    define __init(self, message: String) -> void {
+        super().__init(message)
+    }
+}
+
+// ===== Colours (0xAARRGGBB) =====
+
+define _clamp(v: Int) -> Int {
+    if v < 0 { return 0 }
+    if v > 255 { return 255 }
+    return v
+}
+
+--- An opaque colour from red, green, blue (0-255 each). ---
+define rgb(r: Int, g: Int, b: Int) -> Int {
+    return rgba(r, g, b, 255)
+}
+
+--- A colour with transparency: `a` 0 (invisible) to 255 (opaque). ---
+define rgba(r: Int, g: Int, b: Int, a: Int) -> Int {
+    return _clamp(a) * 16777216 + _clamp(r) * 65536 + _clamp(g) * 256 + _clamp(b)
+}
+
+---
+A colour from `"#rrggbb"`, `"#rrggbbaa"`, `"#rgb"` (with or without `#`).
+@throws ValueError for anything else.
+@example window.hex("#ff8800")
+---
+define hex(code: String) -> Int {
+    s := code.trim().lower()
+    if s.startswith("#") { s = s.substring(1, s.length()) }
+    if s.length() == 3 {
+        s = s.substring(0, 1).repeat(2) + s.substring(1, 2).repeat(2) + s.substring(2, 3).repeat(2)
+    }
+    if s.length() != 6 and s.length() != 8 {
+        throw ValueError("window.hex: expected \"#rrggbb\", got \"" + code + "\"")
+    }
+    digits := "0123456789abcdef"
+    vals := []
+    i := 0
+    while i < s.length() {
+        hi := digits.find(s.substring(i, i + 1))
+        lo := digits.find(s.substring(i + 1, i + 2))
+        if hi < 0 or lo < 0 { throw ValueError("window.hex: not a hex colour: \"" + code + "\"") }
+        vals.append(hi * 16 + lo)
+        i = i + 2
+    }
+    a := 255
+    if vals.length() == 4 { a = vals[3] }
+    return rgba(vals[0], vals[1], vals[2], a)
+}
+
+--- The colour's red, green, blue and alpha parts (0-255). ---
+define channels(color: Int) -> List {
+    c := color
+    if c < 0 { c = c + 4294967296 }
+    return [(c / 65536) % 256, (c / 256) % 256, c % 256, (c / 16777216) % 256]
+}
+
+define black() -> Int { return rgb(0, 0, 0) }
+define white() -> Int { return rgb(255, 255, 255) }
+define gray() -> Int { return rgb(128, 128, 128) }
+define red() -> Int { return rgb(230, 57, 70) }
+define green() -> Int { return rgb(46, 196, 106) }
+define blue() -> Int { return rgb(52, 120, 246) }
+define yellow() -> Int { return rgb(255, 209, 64) }
+define orange() -> Int { return rgb(255, 140, 26) }
+define purple() -> Int { return rgb(150, 90, 230) }
+define transparent() -> Int { return rgba(0, 0, 0, 0) }
+
+// ===== Events =====
+
+---
+Something that happened to a window. `kind` is one of:
+  "close"       — the close button (or Ctrl+C / quit); the window closes
+                  unless `keep_open` was set
+  "key_down" / "key_up" — `key` is the key's name in lower case: "a",
+                  "escape", "return", "space", "left", "f1", "left_shift"...;
+                  `repeat` is true for auto-repeat; `shift` / `ctrl` /
+                  `alt` / `meta` say which modifiers were held
+  "text"        — typed text (`text`), with the keyboard layout and
+                  accents applied — use this for text entry, not key_down
+  "mouse_move"  — `x`, `y`; `left` true while the left button is held
+  "mouse_down" / "mouse_up" — `x`, `y`, `button` (1 left, 2 middle,
+                  3 right), `clicks` (2 for a double click)
+  "wheel"       — `dx`, `dy` (positive = away from you / right)
+  "resize"      — new `width`, `height`
+  "focus" / "blur" — the window gained / lost keyboard focus
+---
+struct Event {
+    kind: String
+    key: String
+    text: String
+    x: Int
+    y: Int
+    button: Int
+    clicks: Int
+    dx: Int
+    dy: Int
+    width: Int
+    height: Int
+    repeat: Bool
+    shift: Bool
+    ctrl: Bool
+    alt: Bool
+    meta: Bool
+    left: Bool
+
+    define __init(self, kind: String) -> void {
+        self.kind = kind
+        self.key = ""
+        self.text = ""
+        self.x = 0
+        self.y = 0
+        self.button = 0
+        self.clicks = 0
+        self.dx = 0
+        self.dy = 0
+        self.width = 0
+        self.height = 0
+        self.repeat = false
+        self.shift = false
+        self.ctrl = false
+        self.alt = false
+        self.meta = false
+        self.left = false
+    }
+
+    define __str(self) -> String {
+        if self.kind == "key_down" or self.kind == "key_up" { return "Event(" + self.kind + " " + self.key + ")" }
+        if self.kind == "text" { return "Event(text \"" + self.text + "\")" }
+        if self.kind.startswith("mouse") { return "Event(" + self.kind + " " + self.x.str() + "," + self.y.str() + ")" }
+        return "Event(" + self.kind + ")"
+    }
+}
+
+_KINDS := ["", "close", "key_down", "key_up", "text", "mouse_move", "mouse_down", "mouse_up", "wheel", "resize", "focus", "blur", "expose"]
+
+define _event(raw: List) -> Event {
+    k: Int = raw[0]
+    a: Int = raw[1]
+    b: Int = raw[2]
+    c: Int = raw[3]
+    d: Int = raw[4]
+    txt: String = raw[5]
+    kind: String = _KINDS[k]
+    e := Event(kind)
+    if kind == "key_down" or kind == "key_up" {
+        e.key = txt
+        e.repeat = b != 0
+        e.shift = d % 2 == 1
+        e.ctrl = (d / 2) % 2 == 1
+        e.alt = (d / 4) % 2 == 1
+        e.meta = (d / 8) % 2 == 1
+    } elif kind == "text" {
+        e.text = txt
+    } elif kind == "mouse_move" {
+        e.x = a
+        e.y = b
+        e.left = c % 2 == 1
+    } elif kind == "mouse_down" or kind == "mouse_up" {
+        e.x = a
+        e.y = b
+        e.button = c
+        e.clicks = d
+    } elif kind == "wheel" {
+        e.dx = a
+        e.dy = b
+    } elif kind == "resize" {
+        e.width = a
+        e.height = b
+    }
+    return e
+}
+
+// ===== Images =====
+
+--- A BMP image loaded for one window (`Window.load_image`). ---
+struct Image {
+    width: Int
+    height: Int
+    _h: Int
+
+    define __init(self, h: Int) -> void {
+        self._h = h
+        wh := image_size_raw(h)
+        self.width = wh[0]
+        self.height = wh[1]
+    }
+
+    --- Release the image's memory. Drawing it afterwards does nothing. ---
+    define free(self) -> void {
+        image_free_raw(self._h)
+        self._h = -1
+    }
+}
+
+// ===== Windows =====
+
+---
+An open window (from `window.open`). Draw into it, then `present()` to
+show the frame; drawing starts from what the last frame left unless you
+`clear` first.
+  `keep_open`  — set true to handle "close" events yourself (e.g. "save
+                 changes?") instead of closing at once
+---
+struct Window {
+    title: String
+    keep_open: Bool
+    _h: Int
+    _mx: Int
+    _my: Int
+    _keys: Map
+
+    define __init(self, h: Int, title: String) -> void {
+        self._h = h
+        self.title = title
+        self.keep_open = false
+        self._mx = 0
+        self._my = 0
+        self._keys = {}
+    }
+
+    --- True until the window is closed (by `close()` or its close button). ---
+    define is_open(self) -> Bool {
+        return self._h >= 0 and is_open_raw(self._h)
+    }
+
+    --- Close the window. Further drawing is ignored. ---
+    define close(self) -> void {
+        if self._h >= 0 {
+            close_raw(self._h)
+            self._h = -1
+        }
+    }
+
+    define _track(self, e: Event) -> void {
+        if e.kind == "mouse_move" or e.kind == "mouse_down" or e.kind == "mouse_up" {
+            self._mx = e.x
+            self._my = e.y
+        }
+        if e.kind == "key_down" { self._keys[e.key] = true }
+        if e.kind == "key_up" { self._keys[e.key] = false }
+        if e.kind == "blur" { self._keys = {} }
+        if e.kind == "close" and not self.keep_open { self.close() }
+    }
+
+    --- Every event since the last call (an empty List if none). Doesn't wait. ---
+    define events(self) -> List {
+        out := []
+        if self._h < 0 { return out }
+        while self._h >= 0 {
+            raw := next_event_raw(self._h, 0)
+            if raw.length() == 0 { break }
+            e := _event(raw)
+            self._track(e)
+            out.append(e)
+        }
+        return out
+    }
+
+    ---
+    Wait for the next event, up to `timeout_ms` (-1: until one comes);
+    null on timeout or once the window is closed. Other tasks run while
+    it waits. For programs that only redraw when something happens.
+    ---
+    define wait_event(self, timeout_ms: Int = -1) -> Event {
+        if self._h < 0 { return null }
+        raw := next_event_raw(self._h, timeout_ms)
+        if raw.length() == 0 { return null }
+        e := _event(raw)
+        self._track(e)
+        return e
+    }
+
+    --- True while `key` (a key name, as in `Event.key`) is held down. ---
+    define key_down(self, key: String) -> Bool {
+        return self._keys.has(key) and self._keys[key]
+    }
+
+    --- The mouse position (x, y) from the latest event. ---
+    define mouse(self) -> Tuple {
+        return (self._mx, self._my)
+    }
+
+    --- Fill the whole window with `color`. ---
+    define clear(self, color: Int = black()) -> void {
+        clear_raw(self._h, color)
+    }
+
+    --- A rectangle with its top-left corner at (x, y); `fill=false` draws the outline. ---
+    define rect(self, x: Int, y: Int, width: Int, height: Int, color: Int, fill: Bool = true) -> void {
+        f := 0
+        if fill { f = 1 }
+        rect_raw(self._h, x, y, width, height, color, f)
+    }
+
+    --- A straight line from (x1, y1) to (x2, y2). ---
+    define line(self, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) -> void {
+        line_raw(self._h, x1, y1, x2, y2, color)
+    }
+
+    --- One pixel. ---
+    define point(self, x: Int, y: Int, color: Int) -> void {
+        point_raw(self._h, x, y, color)
+    }
+
+    --- A circle centred on (cx, cy); `fill=false` draws the outline. ---
+    define circle(self, cx: Int, cy: Int, radius: Int, color: Int, fill: Bool = true) -> void {
+        f := 0
+        if fill { f = 1 }
+        circle_raw(self._h, cx, cy, radius, color, f)
+    }
+
+    ---
+    Draw `text` with its top-left corner at (x, y) in the built-in font
+    (8x16 pixels per character at `scale=1`; "\n" starts a new line).
+    Returns the width drawn, in pixels.
+    ---
+    define text(self, text: String, x: Int, y: Int, color: Int = white(), scale: Int = 1) -> Int {
+        text_raw(self._h, text, x, y, color, scale)
+        return text_width(text, scale)
+    }
+
+    ---
+    Load a BMP image to draw in this window.
+    @throws WindowError if it can't be read.
+    ---
+    define load_image(self, path: String) -> Image {
+        h := image_load_raw(self._h, path)
+        if h < 0 { throw WindowError("window: can't load '" + path + "': " + error()) }
+        return Image(h)
+    }
+
+    --- Draw `img` with its top-left at (x, y), scaled to width x height (-1 = its own size). ---
+    define image(self, img: Image, x: Int, y: Int, width: Int = -1, height: Int = -1) -> void {
+        image_draw_raw(self._h, img._h, x, y, width, height)
+    }
+
+    --- Show everything drawn since the last `present`. ---
+    define present(self) -> void {
+        present_raw(self._h)
+    }
+
+    --- Drawable width in pixels. ---
+    define width(self) -> Int {
+        wh := size_raw(self._h)
+        return wh[0]
+    }
+
+    --- Drawable height in pixels. ---
+    define height(self) -> Int {
+        wh := size_raw(self._h)
+        return wh[1]
+    }
+
+    --- Change the title bar text. ---
+    define set_title(self, title: String) -> void {
+        self.title = title
+        set_title_raw(self._h, title)
+    }
+
+    --- The colour (0xRRGGBB, opaque) of pixel (x, y) in what's been drawn — mostly for tests. ---
+    define pixel(self, x: Int, y: Int) -> Int {
+        return pixel_raw(self._h, x, y)
+    }
+
+    ---
+    Save what's been drawn as a BMP image.
+    @throws WindowError on failure.
+    ---
+    define screenshot(self, path: String) -> void {
+        if save_bmp_raw(self._h, path) != 0 { throw WindowError("window: can't save '" + path + "': " + error()) }
+    }
+
+    define __str(self) -> String {
+        if not self.is_open() { return "Window(\"" + self.title + "\", closed)" }
+        return "Window(\"" + self.title + "\", " + self.width().str() + "x" + self.height().str() + ")"
+    }
+}
+
+---
+Open a window `width` x `height` pixels, centred on the screen.
+@param resizable let the user resize it ("resize" events tell you)
+@param hidden    don't show it (drawing and `screenshot` still work)
+@param vsync     make `present` wait for the display's refresh
+@param headless  no display at all (CI, servers): an off-screen window
+                 for drawing and screenshots. Applies from the first
+                 window opened.
+@throws WindowError when it can't be opened (no SDL2, no display...).
+@example w := window.open("Paint", 800, 600, resizable=true)
+---
+define open(title: String, width: Int, height: Int, resizable: Bool = false, hidden: Bool = false, vsync: Bool = true, headless: Bool = false) -> Window {
+    flags := 0
+    if resizable { flags = flags + 1 }
+    if hidden { flags = flags + 2 }
+    if vsync { flags = flags + 4 }
+    if headless { flags = flags + 8 }
+    h := open_raw(title, width, height, flags)
+    if h < 0 { throw WindowError("window.open: " + error()) }
+    return Window(h, title)
+}
+
+--- Pause for `ms` milliseconds (other tasks run meanwhile). ---
+extern define sleep(ms: Int) -> void
+
+---
+Run window `w` until it closes: each frame, call `frame(w, events)` with
+that frame's events, then `present`, then wait so frames come about
+`fps` times a second. `frame` draws the whole frame (start with
+`w.clear(...)`).
+@example
+define frame(w: window.Window, events: List) -> void {
+    w.clear(window.black())
+    w.text("Frame at " + window.ticks().str() + "ms", 10, 10)
+}
+window.run(window.open("Demo", 400, 300), frame)
+---
+define run(w: Window, frame: Callable, fps: Int = 60) -> void {
+    budget := 1000 / fps
+    while w.is_open() {
+        start := ticks()
+        events := w.events()
+        if not w.is_open() { break }
+        frame(w, events)
+        if not w.is_open() { break }
+        w.present()
+        left := budget - (ticks() - start)
+        if left > 0 { sleep(left) }
+    }
+}
