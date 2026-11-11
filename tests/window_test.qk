@@ -1,4 +1,4 @@
-// window v1.0.0, headless (SDL's dummy video driver — no display needed).
+// window v1.2.0, headless (SDL's dummy video driver — no display needed).
 // Needs SDL2 installed; every test is skipped (passes) when it isn't.
 use window
 use fs
@@ -6,7 +6,7 @@ use test
 
 bg := window.rgb(10, 20, 30)
 
-define open(title: String, width: Int, height: Int) -> window.Window {
+define open_headless(title: String, width: Int, height: Int) -> window.Window {
     return window.open(title, width, height, headless=true)
 }
 
@@ -36,7 +36,7 @@ define test_text_width() -> void {
 // ───── drawing ─────
 define test_open_and_size() -> void {
     if not window.available() { return }
-    w := open("size", 120, 80)
+    w := open_headless("size", 120, 80)
     test.assert_true(w.is_open())
     test.assert_eq(w.width(), 120)
     test.assert_eq(w.height(), 80)
@@ -47,7 +47,7 @@ define test_open_and_size() -> void {
 
 define test_shapes() -> void {
     if not window.available() { return }
-    w := open("shapes", 200, 100)
+    w := open_headless("shapes", 200, 100)
     w.clear(bg)
     w.rect(10, 10, 20, 20, window.rgb(255, 0, 0))
     w.rect(50, 10, 20, 20, window.rgb(0, 0, 255), fill=false)
@@ -68,7 +68,7 @@ define test_shapes() -> void {
 
 define test_transparency_blends() -> void {
     if not window.available() { return }
-    w := open("alpha", 20, 20)
+    w := open_headless("alpha", 20, 20)
     w.clear(window.rgb(0, 0, 0))
     w.rect(0, 0, 20, 20, window.rgba(255, 255, 255, 128))
     c := window.channels(w.pixel(5, 5))
@@ -78,7 +78,7 @@ define test_transparency_blends() -> void {
 
 define test_text_draws_in_its_cell() -> void {
     if not window.available() { return }
-    w := open("text", 100, 40)
+    w := open_headless("text", 100, 40)
     w.clear(bg)
     test.assert_eq(w.text("Hi", 10, 10, window.rgb(0, 0, 255)), 16)
     inside := 0
@@ -97,8 +97,8 @@ define test_text_draws_in_its_cell() -> void {
 
 define test_two_windows_are_separate() -> void {
     if not window.available() { return }
-    a := open("a", 30, 30)
-    b := open("b", 30, 30)
+    a := open_headless("a", 30, 30)
+    b := open_headless("b", 30, 30)
     a.clear(window.rgb(255, 0, 0))
     b.clear(window.rgb(0, 255, 0))
     test.assert_eq(a.pixel(5, 5), 0xff0000)
@@ -111,7 +111,7 @@ define test_two_windows_are_separate() -> void {
 define test_screenshot_and_image() -> void {
     if not window.available() { return }
     dir := fs.temp_dir()
-    w := open("shot", 40, 30)
+    w := open_headless("shot", 40, 30)
     w.clear(window.rgb(0, 128, 255))
     w.rect(0, 0, 10, 10, window.yellow())
     path := fs.join(dir, "shot.bmp")
@@ -132,7 +132,7 @@ define test_screenshot_and_image() -> void {
 
 define test_load_missing_image_throws() -> void {
     if not window.available() { return }
-    w := open("img", 10, 10)
+    w := open_headless("img", 10, 10)
     caught := ""
     try {
         w.load_image("/nonexistent/x.bmp")
@@ -146,7 +146,7 @@ define test_load_missing_image_throws() -> void {
 // ───── events / loop ─────
 define test_events_and_wait() -> void {
     if not window.available() { return }
-    w := open("events", 10, 10)
+    w := open_headless("events", 10, 10)
     // Drain the startup events (focus...), which can arrive a little late.
     tries := 0
     while w.wait_event(50) != null and tries < 20 { tries = tries + 1 }
@@ -170,7 +170,7 @@ define _frame(w: window.Window, events: List) -> void {
 define test_run_calls_frame_until_closed() -> void {
     if not window.available() { return }
     frames = 0
-    w := open("run", 20, 20)
+    w := open_headless("run", 20, 20)
     t0 := window.ticks()
     window.run(w, _frame, fps=100)
     test.assert_eq(frames, 5)
@@ -189,7 +189,7 @@ images := "tests/fixtures/images/"
 
 define test_png_with_transparency() -> void {
     if not window.available() { return }
-    w := open("png", 20, 20)
+    w := open_headless("png", 20, 20)
     img := w.load_image(images + "rgba.png")
     test.assert_eq(img.width, 4)
     test.assert_eq(img.height, 4)
@@ -207,7 +207,7 @@ define test_png_with_transparency() -> void {
 
 define test_jpeg_and_gif() -> void {
     if not window.available() { return }
-    w := open("jpg", 20, 20)
+    w := open_headless("jpg", 20, 20)
     jpg := w.load_image(images + "solid.jpg")
     test.assert_eq(jpg.width, 8)
     w.image(jpg, 0, 0)
@@ -222,7 +222,7 @@ define test_jpeg_and_gif() -> void {
 
 define test_sprite_sheet_region_and_alpha() -> void {
     if not window.available() { return }
-    w := open("sheet", 40, 20)
+    w := open_headless("sheet", 40, 20)
     sheet := w.load_image(images + "sheet.png")
     test.assert_eq(sheet.width, 64)
     w.clear(window.black())
@@ -240,7 +240,7 @@ define test_sprite_sheet_region_and_alpha() -> void {
 
 define test_bad_image_file_throws() -> void {
     if not window.available() { return }
-    w := open("bad", 10, 10)
+    w := open_headless("bad", 10, 10)
     caught := ""
     try {
         w.load_image(images + "not_an_image.png")
@@ -249,4 +249,30 @@ define test_bad_image_file_throws() -> void {
     }
     test.assert_contains(caught, "not an image")
     w.close()
+}
+
+// ───── clipping and the clipboard (v1.2.0) ─────
+define test_clip_limits_drawing() -> void {
+    if not window.available() { return }
+    w := open_headless("clip", 100, 80)
+    w.clear(bg)
+    w.clip(10, 10, 20, 20)
+    w.rect(0, 0, 100, 80, window.white())
+    test.assert_eq(w.pixel(15, 15), 0xffffff)
+    test.assert_eq(w.pixel(9, 15), w.pixel(50, 50))       // still the background
+    test.assert_eq(w.pixel(30, 30), w.pixel(50, 50))      // right / bottom edge excluded
+    w.unclip()
+    w.rect(60, 60, 5, 5, window.white())
+    test.assert_eq(w.pixel(62, 62), 0xffffff)
+    w.clip(0, 0, -5, 10)                                  // negative size: nothing drawn
+    w.rect(0, 0, 100, 80, window.red())
+    test.assert_eq(w.pixel(62, 62), 0xffffff)
+    w.close()
+}
+
+define test_clipboard_round_trip() -> void {
+    window.set_clipboard("copied ✓")
+    test.assert_eq(window.clipboard(), "copied ✓")
+    window.set_clipboard("")
+    test.assert_eq(window.clipboard(), "")
 }

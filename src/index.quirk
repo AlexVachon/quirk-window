@@ -16,7 +16,8 @@ Coordinates are pixels from the top-left corner.
 Text uses a built-in 8x16 pixel font (ASCII and Latin-1 accents) —
 `scale=2` doubles it. Images: PNG, JPEG, BMP, GIF (first frame) and
 TGA files (`w.load_image(path)`), drawn whole, scaled, faded or a
-rectangle at a time (sprite sheets).
+rectangle at a time (sprite sheets). `w.clip(...)` limits drawing to a
+rectangle; `window.clipboard()` / `set_clipboard(text)` copy and paste.
 
 Backed by SDL2, which must be installed (`sudo apt install libsdl2-2.0-0`
 / `brew install sdl2`); `window.available()` checks. Open windows and
@@ -76,6 +77,9 @@ extern define image_load_raw(h: Int, path: String) -> Int
 extern define image_size_raw(img: Int) -> List
 extern define image_draw_raw(h: Int, img: Int, x: Int, y: Int, w: Int, hh: Int, sx: Int, sy: Int, sw: Int, sh: Int, alpha: Int) -> void
 extern define image_free_raw(img: Int) -> void
+extern define clip_raw(h: Int, x: Int, y: Int, w: Int, hh: Int) -> void
+extern define clipboard_raw() -> String
+extern define set_clipboard_raw(text: String) -> void
 
 ---
 Width in pixels of `text` drawn with `Window.text` at `scale` (its
@@ -86,6 +90,19 @@ extern define text_width(text: String, scale: Int = 1) -> Int
 
 --- Milliseconds on a steady clock (for timing frames and animation). ---
 extern define ticks() -> Int
+
+---
+The text on the system clipboard ("" if none). Before any window is open,
+or with headless windows, a clipboard private to the program.
+---
+define clipboard() -> String {
+    return clipboard_raw()
+}
+
+--- Put `text` on the clipboard (see `clipboard()`). ---
+define set_clipboard(text: String) -> void {
+    set_clipboard_raw(text)
+}
 
 --- Thrown when a window can't be opened (no SDL2, no display, ...). ---
 struct WindowError : RuntimeError {
@@ -158,6 +175,11 @@ define yellow() -> Int { return rgb(255, 209, 64) }
 define orange() -> Int { return rgb(255, 140, 26) }
 define purple() -> Int { return rgb(150, 90, 230) }
 define transparent() -> Int { return rgba(0, 0, 0, 0) }
+
+define _nonneg(v: Int) -> Int {
+    if v < 0 { return 0 }
+    return v
+}
 
 // ===== Events =====
 
@@ -453,6 +475,19 @@ struct Window {
     define height(self) -> Int {
         wh := size_raw(self._h)
         return wh[1]
+    }
+
+    ---
+    Only draw inside the rectangle (x, y, width, height) until `unclip()`
+    — for scrolling areas and panels. `clear` still clears everything.
+    ---
+    define clip(self, x: Int, y: Int, width: Int, height: Int) -> void {
+        clip_raw(self._h, x, y, _nonneg(width), _nonneg(height))
+    }
+
+    --- Draw anywhere again (undoes `clip`). ---
+    define unclip(self) -> void {
+        clip_raw(self._h, 0, 0, -1, -1)
     }
 
     --- Change the title bar text. ---
