@@ -47,19 +47,21 @@ window.run(window.open("Follow the mouse", 800, 600), frame)
 | `w.width()`, `height()`, `mouse()`, `key_down(name)`, `set_title`, `close`, `is_open` | Window state |
 | `w.clip(x, y, width, height)`, `w.unclip()` | Only draw inside a rectangle (scrolling areas, panels) |
 | `window.clipboard()`, `window.set_clipboard(text)` | Copy and paste through the system clipboard |
+| `window.load_font(path, size)` → `Font` | A TrueType / OpenType font; `w.text(..., font=f)`, `f.width(text)`, `f.ascent`, `f.descent`, `f.line_height`. UTF-8 text, any character the font has |
 | `w.screenshot(path)`, `w.pixel(x, y)` | Read back what was drawn (BMP / 0xRRGGBB) |
 | `window.run(w, frame, fps=60)` | Frame loop |
 | `window.rgb`, `rgba`, `hex`, `channels`, `white()`, `black()`, `red()`... | Colours (Ints, 0xAARRGGBB) |
 | `window.text_width(text, scale)`, `ticks()`, `sleep(ms)`, `available()` | Helpers |
 
-Text uses the compiler's built-in 8x16 font (ASCII + Latin-1). Several
+Text uses the compiler's built-in 8x16 font (ASCII + Latin-1), or a
+TrueType font you load (`window.load_font`) — no font file ships with it. Several
 windows can be open at once; open and draw from the main program, not
 from an `async` task. `headless=true` draws off-screen with no display
 (tests, CI).
 
 ## Requirements
 
-- The Quirk compiler 7.26.0+ (its runtime has the `Window_*` functions and the image decoder).
+- The Quirk compiler 7.33.0+ (its runtime has the `Window_*` functions and the image decoder).
 - SDL2, loaded when the first window opens:
   `sudo apt install libsdl2-2.0-0` (Debian / Ubuntu),
   `brew install sdl2` (macOS). `window.available()` checks.

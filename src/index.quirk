@@ -18,6 +18,8 @@ Text uses a built-in 8x16 pixel font (ASCII and Latin-1 accents) —
 TGA files (`w.load_image(path)`), drawn whole, scaled, faded or a
 rectangle at a time (sprite sheets). `w.clip(...)` limits drawing to a
 rectangle; `window.clipboard()` / `set_clipboard(text)` copy and paste.
+`window.load_font(path, size)` loads a TrueType font for `w.text(...,
+font=f)` — UTF-8 text, any character the font has.
 
 Backed by SDL2, which must be installed (`sudo apt install libsdl2-2.0-0`
 / `brew install sdl2`); `window.available()` checks. Open windows and
@@ -78,6 +80,11 @@ extern define image_size_raw(img: Int) -> List
 extern define image_draw_raw(h: Int, img: Int, x: Int, y: Int, w: Int, hh: Int, sx: Int, sy: Int, sw: Int, sh: Int, alpha: Int) -> void
 extern define image_free_raw(img: Int) -> void
 extern define clip_raw(h: Int, x: Int, y: Int, w: Int, hh: Int) -> void
+extern define font_load_raw(path: String, size: Int) -> Int
+extern define font_free_raw(f: Int) -> void
+extern define font_metrics_raw(f: Int) -> List
+extern define font_text_width_raw(f: Int, text: String) -> Int
+extern define font_text_raw(h: Int, f: Int, text: String, x: Int, y: Int, color: Int) -> void
 extern define clipboard_raw() -> String
 extern define set_clipboard_raw(text: String) -> void
 
@@ -286,6 +293,56 @@ define _event(raw: List) -> Event {
     return e
 }
 
+// ===== Fonts =====
+
+---
+A TrueType / OpenType font at one pixel size (`window.load_font`). Pass
+it to `Window.text(..., font=f)`. Text is UTF-8 — any character the font
+has is drawn. `size` is the requested height; `ascent` / `descent` are
+how far glyphs reach above / below the baseline, `line_height` the
+distance between lines. One Font works in every window.
+---
+struct Font {
+    size: Int
+    ascent: Int
+    descent: Int
+    line_height: Int
+    _h: Int
+
+    define __init(self, h: Int, size: Int) -> void {
+        self._h = h
+        self.size = size
+        m := font_metrics_raw(h)
+        self.ascent = m[0]
+        self.descent = m[1]
+        self.line_height = m[2]
+    }
+
+    --- Width in pixels of `text` (its longest line) in this font. ---
+    define width(self, text: String) -> Int {
+        return font_text_width_raw(self._h, text)
+    }
+
+    --- Release the font. Drawing with it afterwards does nothing. ---
+    define free(self) -> void {
+        font_free_raw(self._h)
+    }
+}
+
+---
+Load a font file (`.ttf`, or `.otf` with TrueType outlines) at `size`
+pixels tall.
+@throws WindowError if the file can't be read or isn't a font.
+@example
+f := window.load_font("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+w.text("Grüße — ünïcödé ✓", 20, 20, window.white(), font=f)
+---
+define load_font(path: String, size: Int) -> Font {
+    h := font_load_raw(path, size)
+    if h < 0 { throw WindowError("window: can't load font '" + path + "': " + error()) }
+    return Font(h, size)
+}
+
 // ===== Images =====
 
 --- An image loaded for one window (`Window.load_image`); `width` / `height` in pixels. ---
@@ -430,7 +487,11 @@ struct Window {
     (8x16 pixels per character at `scale=1`; "\n" starts a new line).
     Returns the width drawn, in pixels.
     ---
-    define text(self, text: String, x: Int, y: Int, color: Int = white(), scale: Int = 1) -> Int {
+    define text(self, text: String, x: Int, y: Int, color: Int = white(), scale: Int = 1, font: Font = null) -> Int {
+        if font != null {
+            font_text_raw(self._h, font._h, text, x, y, color)
+            return font.width(text)
+        }
         text_raw(self._h, text, x, y, color, scale)
         return text_width(text, scale)
     }

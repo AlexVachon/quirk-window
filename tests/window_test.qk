@@ -1,4 +1,4 @@
-// window v1.2.0, headless (SDL's dummy video driver — no display needed).
+// window v1.3.0, headless (SDL's dummy video driver — no display needed).
 // Needs SDL2 installed; every test is skipped (passes) when it isn't.
 use window
 use fs
@@ -275,4 +275,77 @@ define test_clipboard_round_trip() -> void {
     test.assert_eq(window.clipboard(), "copied ✓")
     window.set_clipboard("")
     test.assert_eq(window.clipboard(), "")
+}
+
+// ───── TrueType fonts (v1.3.0) ─────
+// A font that's usually installed; the font tests skip when none is.
+define system_font() -> String {
+    for p in ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+              "/usr/share/fonts/TTF/DejaVuSans.ttf",
+              "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+              "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+              "/System/Library/Fonts/Supplemental/Arial.ttf",
+              "/Library/Fonts/Arial.ttf",
+              "C:\\Windows\\Fonts\\arial.ttf"] {
+        path: String = p
+        if fs.exists(path) { return path }
+    }
+    return ""
+}
+
+define test_font_metrics_and_width() -> void {
+    path := system_font()
+    if path == "" { return }
+    f := window.load_font(path, 20)
+    test.assert_eq(f.size, 20)
+    test.assert_true(f.ascent > 10 and f.ascent <= 20)
+    test.assert_true(f.descent > 0)
+    test.assert_true(f.line_height >= f.ascent + f.descent)
+    test.assert_eq(f.width(""), 0)
+    test.assert_true(f.width("WWW") > f.width("iii"))          // proportional
+    test.assert_eq(f.width("ab\nab"), f.width("ab"))            // longest line
+    test.assert_true(f.width("✓") > 0 or f.width("é") > 0)      // UTF-8 decoded
+    f.free()
+    test.assert_eq(f.width("x"), 0)                              // freed: nothing
+}
+
+define test_font_drawing() -> void {
+    path := system_font()
+    if path == "" or not window.available() { return }
+    w := open_headless("font", 120, 40)
+    f := window.load_font(path, 24)
+    w.clear(window.black())
+    n := w.text("H", 10, 5, window.white(), font=f)
+    test.assert_eq(n, f.width("H"))
+    // Some pixel of the H's stem is lit.
+    lit := false
+    y := 5
+    while y < 5 + f.ascent {
+        x := 10
+        while x < 10 + n {
+            if w.pixel(x, y) != 0 { lit = true }
+            x = x + 1
+        }
+        y = y + 1
+    }
+    test.assert_true(lit)
+    test.assert_eq(w.pixel(100, 30), 0)                          // nothing elsewhere
+    w.close()
+}
+
+define test_font_load_errors() -> void {
+    caught := ""
+    try {
+        window.load_font("/no/such/font.ttf", 12)
+    } catch (e: window.WindowError) {
+        caught = e.message
+    }
+    test.assert_contains(caught, "can't open")
+    caught = ""
+    try {
+        window.load_font(images + "rgba.png", 12)
+    } catch (e: window.WindowError) {
+        caught = e.message
+    }
+    test.assert_contains(caught, "isn't a TrueType")
 }
