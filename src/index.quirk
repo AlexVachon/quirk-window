@@ -74,6 +74,11 @@ extern define present_raw(h: Int) -> void
 extern define size_raw(h: Int) -> List
 extern define scale_raw(h: Int) -> Double
 extern define text_input_area_raw(h: Int, x: Int, y: Int, w: Int, hh: Int) -> void
+extern define access_active_raw(h: Int) -> Bool
+extern define access_update_raw(h: Int, ids: List, parents: List, roles: List, names: List, values: List, descs: List, states: List, boxes: List, nums: List) -> void
+extern define access_focus_raw(h: Int, id: Int) -> void
+extern define access_changed_raw(h: Int, id: Int, what: Int) -> void
+extern define access_announce_raw(h: Int, text: String) -> void
 extern define simulate_text_raw(h: Int, kind: Int, text: String, start: Int, length: Int) -> void
 extern define set_title_raw(h: Int, title: String) -> void
 extern define pixel_raw(h: Int, x: Int, y: Int) -> Int
@@ -216,6 +221,11 @@ Something that happened to a window. `kind` is one of:
                   position inside it and `length` how much of it the
                   input method has selected (characters). An empty
                   `text` ends the composition. See `text_input_area`.
+  "access"      — a screen reader asks for `action` ("invoke", "toggle",
+                  "set_value", "set_range", "select", "expand",
+                  "collapse", "focus") on node `target` of the tree sent
+                  with `access_update`; `text` is the new value. `ui`
+                  handles these itself.
   "mouse_move"  — `x`, `y`; `left` true while the left button is held
   "mouse_down" / "mouse_up" — `x`, `y`, `button` (1 left, 2 middle,
                   3 right), `clicks` (2 for a double click)
@@ -243,6 +253,8 @@ struct Event {
     left: Bool
     cursor: Int
     length: Int
+    action: String
+    target: Int
 
     define __init(self, kind: String) -> void {
         self.kind = kind
@@ -264,6 +276,8 @@ struct Event {
         self.left = false
         self.cursor = 0
         self.length = 0
+        self.action = ""
+        self.target = 0
     }
 
     define __str(self) -> String {
@@ -275,7 +289,8 @@ struct Event {
     }
 }
 
-_KINDS := ["", "close", "key_down", "key_up", "text", "mouse_move", "mouse_down", "mouse_up", "wheel", "resize", "focus", "blur", "expose", "compose"]
+_KINDS := ["", "close", "key_down", "key_up", "text", "mouse_move", "mouse_down", "mouse_up", "wheel", "resize", "focus", "blur", "expose", "compose", "access"]
+_ACCESS_ACTIONS := ["", "invoke", "toggle", "set_value", "select", "expand", "collapse", "focus", "set_range"]
 
 define _event(raw: List) -> Event {
     k: Int = raw[0]
@@ -299,6 +314,10 @@ define _event(raw: List) -> Event {
         e.text = txt
         e.cursor = a
         e.length = b
+    } elif kind == "access" {
+        e.target = a
+        e.text = txt
+        if c >= 0 and c < _ACCESS_ACTIONS.length() { e.action = _ACCESS_ACTIONS[c] }
     } elif kind == "mouse_move" {
         e.x = a
         e.y = b
@@ -644,6 +663,47 @@ struct Window {
         if area == self._ime { return }
         self._ime = area
         text_input_area_raw(self._h, x, y, width, height)
+    }
+
+    ---
+    True while a screen reader is reading this window (Windows UI
+    Automation; always false elsewhere for now) — then send it the
+    accessibility tree each frame with `access_update`. `ui` does this.
+    ---
+    define access_active(self) -> Bool {
+        return access_active_raw(self._h)
+    }
+
+    ---
+    Send the accessibility tree, flattened parents-first (node 0 is the
+    window): per node its `id` (> 0, stable across frames), the index of
+    its parent (-1 for node 0), role, name, value, description, a state
+    bitmask (1 focusable, 2 focused, 4 disabled, 8 checked, 16 selected,
+    32 expanded, 64 collapsed, 128 editable, 256 multiline), its box as
+    4 Ints (x, y, width, height in drawing pixels) in `boxes`, and 4 Ints
+    in `nums`: tree level, then range minimum, maximum and value (sliders).
+    ---
+    define access_update(self, ids: List, parents: List, roles: List, names: List, values: List, descs: List, states: List, boxes: List, nums: List) -> void {
+        access_update_raw(self._h, ids, parents, roles, names, values, descs, states, boxes, nums)
+    }
+
+    --- Tell the screen reader that keyboard focus moved to node `id`. ---
+    define access_focus(self, id: Int) -> void {
+        access_focus_raw(self._h, id)
+    }
+
+    --- Node `id` changed: `what` = "value", "checked", "selected", "expanded" or "name". ---
+    define access_changed(self, id: Int, what: String) -> void {
+        codes := {"value": 1, "checked": 2, "selected": 3, "expanded": 4, "name": 5}
+        if codes.has(what) {
+            c: Int = codes[what]
+            access_changed_raw(self._h, id, c)
+        }
+    }
+
+    --- Have the screen reader say `text` (a status message). ---
+    define access_announce(self, text: String) -> void {
+        access_announce_raw(self._h, text)
     }
 
     ---

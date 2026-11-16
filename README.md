@@ -50,6 +50,7 @@ window.run(window.open("Follow the mouse", 800, 600), frame)
 | `window.load_font(path, size, fallback=true)` → `Font` | A TrueType / OpenType font; `w.text(..., font=f)`, `f.width(text)`, `f.ascent`, `f.descent`, `f.line_height`, `f.covers(text)`. UTF-8 text: characters the font lacks (CJK, Hangul, Arabic, Hebrew, Thai...) come from installed system fonts, or ones you add with `f.add_fallback(path)` |
 | `window.is_rtl(text)`, `window.has_rtl(text)`; `f.caret_x(text, i)`, `f.index_at(text, x)`, `f.selection(text, a, b)` | Right-to-left text: Hebrew and Arabic are drawn in visual order (Unicode bidi), Arabic letters joined; carets, clicks and selections for text fields |
 | `w.text_input_area(x, y, width, height)` | Where the cursor is, so an input method's candidate list opens next to it (see the `compose` event) |
+| `w.access_active()`, `w.access_update(...)`, `access_focus`, `access_changed`, `access_announce` | Screen readers: send an accessibility tree (Windows UI Automation — experimental, `QUIRK_ACCESSIBILITY=1`); requests come back as `access` events. `ui` does this for you |
 | `w.scale()` | Physical pixels per drawing pixel — 2.0 on a Retina / 200% screen (see High DPI) |
 | `w.screenshot(path)`, `w.pixel(x, y)` | Read back what was drawn (BMP at full resolution / 0xRRGGBB) |
 | `window.run(w, frame, fps=60)` | Frame loop |
