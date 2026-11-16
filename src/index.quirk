@@ -72,6 +72,7 @@ extern define circle_raw(h: Int, cx: Int, cy: Int, r: Int, color: Int, fill: Int
 extern define text_raw(h: Int, text: String, x: Int, y: Int, color: Int, scale: Int) -> void
 extern define present_raw(h: Int) -> void
 extern define size_raw(h: Int) -> List
+extern define scale_raw(h: Int) -> Double
 extern define set_title_raw(h: Int, title: String) -> void
 extern define pixel_raw(h: Int, x: Int, y: Int) -> Int
 extern define save_bmp_raw(h: Int, path: String) -> Int
@@ -526,16 +527,28 @@ struct Window {
         present_raw(self._h)
     }
 
-    --- Drawable width in pixels. ---
+    --- Drawable width in (drawing) pixels — see `scale()`. ---
     define width(self) -> Int {
         wh := size_raw(self._h)
         return wh[0]
     }
 
-    --- Drawable height in pixels. ---
+    --- Drawable height in (drawing) pixels — see `scale()`. ---
     define height(self) -> Int {
         wh := size_raw(self._h)
         return wh[1]
+    }
+
+    ---
+    Physical pixels per drawing pixel: 1.0 on a standard screen, 2.0 on a
+    Retina / 200% one. Everything you draw is in drawing pixels — sizes
+    and text come out the same physical size on every screen, and text and
+    shapes use the full resolution. Use it to pick a sharper image
+    (`icon@2x.png` when it's 2 or more). Set QUIRK_UI_SCALE (e.g. 1.5) to
+    scale a program where the system doesn't (X11).
+    ---
+    define scale(self) -> Double {
+        return scale_raw(self._h)
     }
 
     ---

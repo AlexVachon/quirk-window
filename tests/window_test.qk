@@ -1,4 +1,4 @@
-// window v1.3.0, headless (SDL's dummy video driver — no display needed).
+// window v1.4.0, headless (SDL's dummy video driver — no display needed).
 // Needs SDL2 installed; every test is skipped (passes) when it isn't.
 use window
 use fs
@@ -118,10 +118,11 @@ define test_screenshot_and_image() -> void {
     w.screenshot(path)
     test.assert_true(fs.size(path) > 40 * 30 * 3)
     img := w.load_image(path)
-    test.assert_eq(img.width, 40)
-    test.assert_eq(img.height, 30)
+    // Saved at full resolution: 40 x 30 drawing pixels x the scale.
+    test.assert_eq(img.width, Int(40 * w.scale() + 0.5))
+    test.assert_eq(img.height, Int(30 * w.scale() + 0.5))
     w.clear(window.black())
-    w.image(img, 0, 0)
+    w.image(img, 0, 0, 40, 30)
     test.assert_eq(w.pixel(20, 20), 0x0080ff)
     test.assert_eq(w.pixel(5, 5), window.channels(window.yellow())[0] * 65536 + window.channels(window.yellow())[1] * 256 + window.channels(window.yellow())[2])
     w.image(img, 0, 0, 80, 60)
@@ -348,4 +349,22 @@ define test_font_load_errors() -> void {
         caught = e.message
     }
     test.assert_contains(caught, "isn't a TrueType")
+}
+
+// High DPI: drawing is in logical pixels whatever the scale (QUIRK_UI_SCALE
+// / the screen's pixel ratio) — the size is what was asked for, and a
+// rectangle covers the same logical pixels.
+define test_scale_keeps_logical_pixels() -> void {
+    if not window.available() { return }
+    w := open_headless("scale", 80, 60)
+    test.assert_true(w.scale() >= 0.5)
+    test.assert_eq(w.width(), 80)
+    test.assert_eq(w.height(), 60)
+    w.clear(window.black())
+    w.rect(10, 10, 20, 20, window.white(), fill=true)
+    test.assert_eq(w.pixel(10, 10), 0xFFFFFF)
+    test.assert_eq(w.pixel(29, 29), 0xFFFFFF)
+    test.assert_eq(w.pixel(30, 30), 0)
+    test.assert_eq(w.pixel(9, 9), 0)
+    w.close()
 }

@@ -48,7 +48,8 @@ window.run(window.open("Follow the mouse", 800, 600), frame)
 | `w.clip(x, y, width, height)`, `w.unclip()` | Only draw inside a rectangle (scrolling areas, panels) |
 | `window.clipboard()`, `window.set_clipboard(text)` | Copy and paste through the system clipboard |
 | `window.load_font(path, size)` → `Font` | A TrueType / OpenType font; `w.text(..., font=f)`, `f.width(text)`, `f.ascent`, `f.descent`, `f.line_height`. UTF-8 text, any character the font has |
-| `w.screenshot(path)`, `w.pixel(x, y)` | Read back what was drawn (BMP / 0xRRGGBB) |
+| `w.scale()` | Physical pixels per drawing pixel — 2.0 on a Retina / 200% screen (see High DPI) |
+| `w.screenshot(path)`, `w.pixel(x, y)` | Read back what was drawn (BMP at full resolution / 0xRRGGBB) |
 | `window.run(w, frame, fps=60)` | Frame loop |
 | `window.rgb`, `rgba`, `hex`, `channels`, `white()`, `black()`, `red()`... | Colours (Ints, 0xAARRGGBB) |
 | `window.text_width(text, scale)`, `ticks()`, `sleep(ms)`, `available()` | Helpers |
@@ -58,6 +59,18 @@ TrueType font you load (`window.load_font`) — no font file ships with it. Seve
 windows can be open at once; open and draw from the main program, not
 from an `async` task. `headless=true` draws off-screen with no display
 (tests, CI).
+
+## High DPI
+
+Everything is in drawing pixels: a 400 x 300 window, a 16 px font and a
+10 px margin come out the same physical size on every screen. On a
+high-density screen (macOS Retina, Windows at 150% / 200%, Wayland
+scaling) text, circles and images use the full resolution, so they stay
+sharp; `w.scale()` says how many physical pixels a drawing pixel is (use
+it to pick an `@2x` image). Where the system doesn't scale windows (X11),
+set `QUIRK_UI_SCALE=2` (or `GDK_SCALE`) — fractional values like `1.5`
+work too. `w.pixel(x, y)` reads the middle of a drawing pixel; at a
+fractional scale, the edges of shapes and images are resampled.
 
 ## Requirements
 
