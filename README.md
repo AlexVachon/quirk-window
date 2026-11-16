@@ -47,7 +47,7 @@ window.run(window.open("Follow the mouse", 800, 600), frame)
 | `w.width()`, `height()`, `mouse()`, `key_down(name)`, `set_title`, `close`, `is_open` | Window state |
 | `w.clip(x, y, width, height)`, `w.unclip()` | Only draw inside a rectangle (scrolling areas, panels) |
 | `window.clipboard()`, `window.set_clipboard(text)` | Copy and paste through the system clipboard |
-| `window.load_font(path, size)` → `Font` | A TrueType / OpenType font; `w.text(..., font=f)`, `f.width(text)`, `f.ascent`, `f.descent`, `f.line_height`. UTF-8 text, any character the font has |
+| `window.load_font(path, size, fallback=true)` → `Font` | A TrueType / OpenType font; `w.text(..., font=f)`, `f.width(text)`, `f.ascent`, `f.descent`, `f.line_height`, `f.covers(text)`. UTF-8 text: characters the font lacks (CJK, Hangul, Arabic, Hebrew, Thai...) come from installed system fonts, or ones you add with `f.add_fallback(path)` |
 | `w.text_input_area(x, y, width, height)` | Where the cursor is, so an input method's candidate list opens next to it (see the `compose` event) |
 | `w.scale()` | Physical pixels per drawing pixel — 2.0 on a Retina / 200% screen (see High DPI) |
 | `w.screenshot(path)`, `w.pixel(x, y)` | Read back what was drawn (BMP at full resolution / 0xRRGGBB) |

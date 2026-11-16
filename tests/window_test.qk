@@ -387,3 +387,54 @@ define test_ime_compose_then_text() -> void {
     test.assert_eq(got, ["compose:にほ:2:0", "compose:日本:2:2", "text:日本:0:0", "compose::0:0"])
     w.close()
 }
+
+// Font fallback: characters the font lacks come from a fallback font —
+// an added one, or the system's (when it has one for the script).
+define test_font_fallback() -> void {
+    path := system_font()
+    if path == "" { return }
+    plain := window.load_font(path, 20, fallback=false)
+    test.assert_true(plain.covers("Hello"))
+    test.assert_false(plain.covers("日本"))
+    cjk := ""
+    for p in ["/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf",
+              "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+              "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+              "/System/Library/Fonts/PingFang.ttc",
+              "C:\\Windows\\Fonts\\msyh.ttc"] {
+        q: String = p
+        if fs.exists(q) { cjk = q }
+    }
+    if cjk == "" { return }
+    before := plain.width("日本")
+    plain.add_fallback(cjk)
+    test.assert_true(plain.covers("Hello 日本"))
+    test.assert_true(plain.width("日本") != before)          // now measured from the fallback
+    test.assert_eq(plain.line_height, window.load_font(path, 20, fallback=false).line_height)
+    auto := window.load_font(path, 20)
+    test.assert_true(auto.covers("日本"))                     // a system font has it
+    if window.available() {
+        w := open_headless("fallback", 80, 40)
+        w.clear(window.black())
+        n := w.text("日", 4, 4, window.white(), font=plain)
+        lit := false
+        y := 4
+        while y < 30 {
+            x := 4
+            while x < 4 + n {
+                if w.pixel(x, y) != 0 { lit = true }
+                x = x + 1
+            }
+            y = y + 1
+        }
+        test.assert_true(lit)
+        w.close()
+    }
+    caught := false
+    try {
+        plain.add_fallback("/nonexistent/font.ttf")
+    } catch (window.WindowError) {
+        caught = true
+    }
+    test.assert_true(caught)
+}

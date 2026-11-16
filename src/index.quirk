@@ -83,7 +83,9 @@ extern define image_size_raw(img: Int) -> List
 extern define image_draw_raw(h: Int, img: Int, x: Int, y: Int, w: Int, hh: Int, sx: Int, sy: Int, sw: Int, sh: Int, alpha: Int) -> void
 extern define image_free_raw(img: Int) -> void
 extern define clip_raw(h: Int, x: Int, y: Int, w: Int, hh: Int) -> void
-extern define font_load_raw(path: String, size: Int) -> Int
+extern define font_load_raw(path: String, size: Int, fallback: Int) -> Int
+extern define font_add_fallback_raw(f: Int, path: String) -> Int
+extern define font_covers_raw(f: Int, text: String) -> Bool
 extern define font_free_raw(f: Int) -> void
 extern define font_metrics_raw(f: Int) -> List
 extern define font_text_width_raw(f: Int, text: String) -> Int
@@ -345,18 +347,41 @@ struct Font {
     define free(self) -> void {
         font_free_raw(self._h)
     }
+
+    ---
+    Draw characters this font doesn't have (other scripts, symbols) from
+    the font file at `path` — tried before the system fallbacks, in the
+    order added. Text keeps this font's size and line height.
+    @throws WindowError if the file can't be read or isn't a font.
+    @example
+    f.add_fallback("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
+    ---
+    define add_fallback(self, path: String) -> void {
+        if font_add_fallback_raw(self._h, path) < 0 {
+            throw WindowError("window: can't use font '" + path + "': " + error())
+        }
+    }
+
+    --- True if every character of `text` can be drawn — by this font or one of its fallbacks. ---
+    define covers(self, text: String) -> Bool {
+        return font_covers_raw(self._h, text)
+    }
 }
 
 ---
-Load a font file (`.ttf`, or `.otf` with TrueType outlines) at `size`
-pixels tall.
+Load a font file (`.ttf`, `.otf`, or the first font of a `.ttc`) at
+`size` pixels tall. Characters it doesn't have — Chinese, Japanese,
+Korean, Arabic, Hebrew, Thai, symbols — come from the system's fonts
+(Noto, Microsoft YaHei, PingFang, ...: whichever are installed, read the
+first time one is needed); `fallback=false` turns that off. Add your own
+with `Font.add_fallback`.
 @throws WindowError if the file can't be read or isn't a font.
 @example
 f := window.load_font("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-w.text("Grüße — ünïcödé ✓", 20, 20, window.white(), font=f)
+w.text("Grüße — 東京 — ✓", 20, 20, window.white(), font=f)
 ---
-define load_font(path: String, size: Int) -> Font {
-    h := font_load_raw(path, size)
+define load_font(path: String, size: Int, fallback: Bool = true) -> Font {
+    h := font_load_raw(path, size, fallback ? 1 : 0)
     if h < 0 { throw WindowError("window: can't load font '" + path + "': " + error()) }
     return Font(h, size)
 }
