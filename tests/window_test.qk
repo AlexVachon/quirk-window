@@ -438,3 +438,36 @@ define test_font_fallback() -> void {
     }
     test.assert_true(caught)
 }
+
+// Right-to-left text: Hebrew is drawn in visual order (the first letter
+// on the right), carets and clicks follow it, mixed runs keep their own
+// direction; Arabic letters take their joined forms.
+define test_rtl_layout_and_carets() -> void {
+    path := system_font()
+    if path == "" { return }
+    f := window.load_font(path, 20)
+    if not f.covers("שלום") { return }
+    test.assert_true(window.is_rtl("שלום abc"))
+    test.assert_false(window.is_rtl("abc שלום"))
+    test.assert_false(window.is_rtl("123"))
+    he := "שלום"
+    w := f.width(he)
+    test.assert_true(w - f.caret_x(he, 0) <= 1)            // before the first letter: the right edge (width rounds up)
+    test.assert_eq(f.caret_x(he, 4), 0)                   // after the last: the left edge
+    test.assert_true(f.caret_x(he, 1) < w and f.caret_x(he, 1) > 0)
+    test.assert_eq(f.index_at(he, w - 1), 0)               // clicking near the right edge
+    test.assert_eq(f.index_at(he, 0), 4)
+    // Plain text: carets are prefix widths.
+    test.assert_true(f.width("ab") - f.caret_x("abc", 2) <= 1)
+    test.assert_eq(f.index_at("abc", f.caret_x("abc", 2)), 2)
+    // Mixed: "ab " then a Hebrew run; selecting across both gives two pieces.
+    mixed := "ab שלום"
+    test.assert_eq(f.caret_x(mixed, 0), 0)
+    test.assert_true(f.caret_x(mixed, 3) > f.caret_x(mixed, 4))   // inside the RTL run carets go leftwards
+    test.assert_eq(f.selection(mixed, 0, 2).length(), 1)
+    test.assert_eq(f.selection(mixed, 1, 5).length(), 2)
+    // Arabic joins: the word is narrower than its letters drawn apart.
+    if f.covers("سلام") {
+        test.assert_true(f.width("سلام") < f.width("س") + f.width("ل") + f.width("ا") + f.width("م"))
+    }
+}
