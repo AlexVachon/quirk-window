@@ -41,13 +41,14 @@ window.run(window.open("Follow the mouse", 800, 600), frame)
 | | |
 |---|---|
 | `window.open(title, w, h, resizable=, hidden=, vsync=, headless=)` | A new `Window` (throws `WindowError` if it can't) |
-| `w.events()` / `w.wait_event(timeout_ms)` | `Event`s: `kind` = `close`, `key_down` / `key_up` (`key`, `shift`, `ctrl`...), `text`, `mouse_move` / `mouse_down` / `mouse_up` (`x`, `y`, `button`), `wheel`, `resize`, `focus`, `blur` |
+| `w.events()` / `w.wait_event(timeout_ms)` | `Event`s: `kind` = `close`, `key_down` / `key_up` (`key`, `shift`, `ctrl`...), `text`, `mouse_move` / `mouse_down` / `mouse_up` (`x`, `y`, `button`), `wheel`, `resize`, `focus`, `blur`, `compose` (an input method composing: `text`, `cursor`, `length`) |
 | `w.clear`, `rect`, `line`, `point`, `circle`, `text`, `image` | Drawing; `present()` shows the frame. `image(img, x, y, width=, height=, src_x=, src_y=, src_w=, src_h=, alpha=)` scales, crops (sprite sheets) and fades |
 | `w.load_image(path)` | An `Image` from PNG (with transparency), JPEG, BMP, GIF (first frame) or TGA |
 | `w.width()`, `height()`, `mouse()`, `key_down(name)`, `set_title`, `close`, `is_open` | Window state |
 | `w.clip(x, y, width, height)`, `w.unclip()` | Only draw inside a rectangle (scrolling areas, panels) |
 | `window.clipboard()`, `window.set_clipboard(text)` | Copy and paste through the system clipboard |
 | `window.load_font(path, size)` → `Font` | A TrueType / OpenType font; `w.text(..., font=f)`, `f.width(text)`, `f.ascent`, `f.descent`, `f.line_height`. UTF-8 text, any character the font has |
+| `w.text_input_area(x, y, width, height)` | Where the cursor is, so an input method's candidate list opens next to it (see the `compose` event) |
 | `w.scale()` | Physical pixels per drawing pixel — 2.0 on a Retina / 200% screen (see High DPI) |
 | `w.screenshot(path)`, `w.pixel(x, y)` | Read back what was drawn (BMP at full resolution / 0xRRGGBB) |
 | `window.run(w, frame, fps=60)` | Frame loop |

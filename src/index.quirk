@@ -73,6 +73,8 @@ extern define text_raw(h: Int, text: String, x: Int, y: Int, color: Int, scale: 
 extern define present_raw(h: Int) -> void
 extern define size_raw(h: Int) -> List
 extern define scale_raw(h: Int) -> Double
+extern define text_input_area_raw(h: Int, x: Int, y: Int, w: Int, hh: Int) -> void
+extern define simulate_text_raw(h: Int, kind: Int, text: String, start: Int, length: Int) -> void
 extern define set_title_raw(h: Int, title: String) -> void
 extern define pixel_raw(h: Int, x: Int, y: Int) -> Int
 extern define save_bmp_raw(h: Int, path: String) -> Int
@@ -201,6 +203,12 @@ Something that happened to a window. `kind` is one of:
                   `alt` / `meta` say which modifiers were held
   "text"        — typed text (`text`), with the keyboard layout and
                   accents applied — use this for text entry, not key_down
+  "compose"     — an input method (Chinese, Japanese, Korean, dead keys...)
+                  is composing `text`: show it at the cursor (underlined)
+                  until it arrives as a "text" event; `cursor` is the
+                  position inside it and `length` how much of it the
+                  input method has selected (characters). An empty
+                  `text` ends the composition. See `text_input_area`.
   "mouse_move"  — `x`, `y`; `left` true while the left button is held
   "mouse_down" / "mouse_up" — `x`, `y`, `button` (1 left, 2 middle,
                   3 right), `clicks` (2 for a double click)
@@ -226,6 +234,8 @@ struct Event {
     alt: Bool
     meta: Bool
     left: Bool
+    cursor: Int
+    length: Int
 
     define __init(self, kind: String) -> void {
         self.kind = kind
@@ -245,17 +255,20 @@ struct Event {
         self.alt = false
         self.meta = false
         self.left = false
+        self.cursor = 0
+        self.length = 0
     }
 
     define __str(self) -> String {
         if self.kind == "key_down" or self.kind == "key_up" { return "Event(" + self.kind + " " + self.key + ")" }
         if self.kind == "text" { return "Event(text \"" + self.text + "\")" }
+        if self.kind == "compose" { return "Event(compose \"" + self.text + "\")" }
         if self.kind.startswith("mouse") { return "Event(" + self.kind + " " + self.x.str() + "," + self.y.str() + ")" }
         return "Event(" + self.kind + ")"
     }
 }
 
-_KINDS := ["", "close", "key_down", "key_up", "text", "mouse_move", "mouse_down", "mouse_up", "wheel", "resize", "focus", "blur", "expose"]
+_KINDS := ["", "close", "key_down", "key_up", "text", "mouse_move", "mouse_down", "mouse_up", "wheel", "resize", "focus", "blur", "expose", "compose"]
 
 define _event(raw: List) -> Event {
     k: Int = raw[0]
@@ -275,6 +288,10 @@ define _event(raw: List) -> Event {
         e.meta = (d / 8) % 2 == 1
     } elif kind == "text" {
         e.text = txt
+    } elif kind == "compose" {
+        e.text = txt
+        e.cursor = a
+        e.length = b
     } elif kind == "mouse_move" {
         e.x = a
         e.y = b
@@ -382,6 +399,7 @@ struct Window {
     _mx: Int
     _my: Int
     _keys: Map
+    _ime: List
 
     define __init(self, h: Int, title: String) -> void {
         self._h = h
@@ -390,6 +408,7 @@ struct Window {
         self._mx = 0
         self._my = 0
         self._keys = {}
+        self._ime = []
     }
 
     --- True until the window is closed (by `close()` or its close button). ---
@@ -537,6 +556,29 @@ struct Window {
     define height(self) -> Int {
         wh := size_raw(self._h)
         return wh[1]
+    }
+
+    ---
+    Tell the input method where text is being typed — the cursor's
+    rectangle — so its candidate list (Chinese, Japanese, Korean input)
+    opens next to it. Call it while a text field has focus (every frame is
+    fine; it only reaches the system when the rectangle moves).
+    ---
+    define text_input_area(self, x: Int, y: Int, width: Int, height: Int) -> void {
+        area := [x, y, width, height]
+        if area == self._ime { return }
+        self._ime = area
+        text_input_area_raw(self._h, x, y, width, height)
+    }
+
+    ---
+    For tests: queue a "text" event, as if `text` had been typed — or, with
+    `compose=true`, a "compose" event (an input method composing `text`,
+    its cursor at `cursor`, `length` characters selected). The event comes
+    back from `events()` like a real one.
+    ---
+    define simulate_text(self, text: String, compose: Bool = false, cursor: Int = 0, length: Int = 0) -> void {
+        simulate_text_raw(self._h, compose ? 1 : 0, text, cursor, length)
     }
 
     ---

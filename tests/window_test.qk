@@ -368,3 +368,22 @@ define test_scale_keeps_logical_pixels() -> void {
     test.assert_eq(w.pixel(9, 9), 0)
     w.close()
 }
+
+// IME: a composition arrives as "compose" events (text, cursor, selected
+// length), then the result as "text".
+define test_ime_compose_then_text() -> void {
+    if not window.available() { return }
+    w := open_headless("ime", 40, 20)
+    w.text_input_area(5, 5, 1, 16)
+    w.simulate_text("にほ", compose=true, cursor=2)
+    w.simulate_text("日本", compose=true, cursor=2, length=2)
+    w.simulate_text("日本", compose=false)
+    w.simulate_text("", compose=true)
+    got := []
+    for e in w.events() {
+        ev: window.Event = e
+        got.append(ev.kind + ":" + ev.text + ":" + String(ev.cursor) + ":" + String(ev.length))
+    }
+    test.assert_eq(got, ["compose:にほ:2:0", "compose:日本:2:2", "text:日本:0:0", "compose::0:0"])
+    w.close()
+}
