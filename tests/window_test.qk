@@ -488,3 +488,29 @@ define test_access_bridge_calls() -> void {
     test.assert_eq(e.target, 0)
     w.close()
 }
+
+// A title bar of one's own: where presses drag or resize the window.
+define test_borderless_hit_areas() -> void {
+    if not window.available() { return }
+    w := window.open("bar", 300, 200, headless=true, borderless=true, resizable=true)
+    test.assert_true(w.borderless())
+    test.assert_false(w.maximized())
+    w.set_hit_areas([[0, 0, 300, 30]], [[210, 0, 90, 30]], border=4)
+    test.assert_eq(w.hit_at(100, 15), "drag")
+    test.assert_eq(w.hit_at(250, 15), "")                       // a button: the program's
+    test.assert_eq(w.hit_at(100, 100), "")
+    test.assert_eq(w.hit_at(100, 1), "resize_top")
+    test.assert_eq(w.hit_at(299, 199), "resize_bottom_right")
+    test.assert_eq(w.hit_at(0, 100), "resize_left")
+    w.set_hit_areas([[0, 0, 300, 30]], border=0)
+    test.assert_eq(w.hit_at(100, 1), "drag")                     // no edges
+    test.assert_eq(w.inset(), [0, 0, 0, 0])
+    w.minimize()                                                 // safe headless
+    w.restore()
+    w.set_opacity(0.5)
+    w.close()
+    plain := window.open("plain", 50, 50, headless=true)
+    test.assert_false(plain.borderless())
+    test.assert_eq(plain.hit_at(10, 10), "")
+    plain.close()
+}
