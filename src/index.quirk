@@ -849,6 +849,15 @@ struct Window {
     Save what's been drawn as a BMP image.
     @throws WindowError on failure.
     ---
+    ---
+    The window's icon (its title bar's, the taskbar's, Alt+Tab's) from an
+    image file — a PNG about 256x256 with transparency. False if it couldn't
+    (no such file, an SDL without icons).
+    ---
+    define set_icon(self, path: String) -> Bool {
+        return set_icon_raw(self._h, path) == 1
+    }
+
     define screenshot(self, path: String) -> void {
         if save_bmp_raw(self._h, path) != 0 { throw WindowError("window: can't save '" + path + "': " + error()) }
     }
@@ -914,6 +923,7 @@ define run(w: Window, frame: Callable, fps: Int = 60) -> void {
 }
 
 extern define caps_lock_raw() -> Int
+extern define set_icon_raw(h: Int, path: String) -> Int
 
 ---
 True while Caps Lock is on, as the window system sees it (asked now, not

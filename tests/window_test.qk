@@ -529,3 +529,15 @@ define test_caps_lock() -> void {
     test.assert_true(on or not on)
     w.close()
 }
+
+// v1.11.0: the window's icon from an image file.
+define test_set_icon() -> void {
+    if not window.available() { return }
+    w := window.open("icon", 100, 80, headless=true)
+    test.assert_false(w.set_icon("no/such/icon.png"))
+    test.assert_true(window.error().contains("icon"))
+    icon := fs.join(fs.temp_dir(prefix="qwin-icon-"), "i.bmp")
+    w.screenshot(icon)                                    // (any image will do)
+    test.assert_true(w.set_icon(icon))
+    w.close()
+}
