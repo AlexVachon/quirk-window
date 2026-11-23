@@ -218,7 +218,8 @@ Something that happened to a window. `kind` is one of:
   "key_down" / "key_up" — `key` is the key's name in lower case: "a",
                   "escape", "return", "space", "left", "f1", "left_shift"...;
                   `repeat` is true for auto-repeat; `shift` / `ctrl` /
-                  `alt` / `meta` say which modifiers were held
+                  `alt` / `meta` say which modifiers were held, `caps`
+                  whether Caps Lock was on
   "text"        — typed text (`text`), with the keyboard layout and
                   accents applied — use this for text entry, not key_down
   "compose"     — an input method (Chinese, Japanese, Korean, dead keys...)
@@ -256,6 +257,7 @@ struct Event {
     ctrl: Bool
     alt: Bool
     meta: Bool
+    caps: Bool
     left: Bool
     cursor: Int
     length: Int
@@ -279,6 +281,7 @@ struct Event {
         self.ctrl = false
         self.alt = false
         self.meta = false
+        self.caps = false
         self.left = false
         self.cursor = 0
         self.length = 0
@@ -314,6 +317,7 @@ define _event(raw: List) -> Event {
         e.ctrl = (d / 2) % 2 == 1
         e.alt = (d / 4) % 2 == 1
         e.meta = (d / 8) % 2 == 1
+        e.caps = (d / 16) % 2 == 1
     } elif kind == "text" {
         e.text = txt
     } elif kind == "compose" {
@@ -907,4 +911,16 @@ define run(w: Window, frame: Callable, fps: Int = 60) -> void {
         left := budget - (ticks() - start)
         if left > 0 { sleep(left) }
     }
+}
+
+extern define caps_lock_raw() -> Int
+
+---
+True while Caps Lock is on, as the window system sees it (asked now, not
+from the last key). Under WSLg this can differ from the keyboard's light
+— letters typed then come out in capitals: show it (an editor's status
+bar). False before a window is open.
+---
+define caps_lock() -> Bool {
+    return caps_lock_raw() == 1
 }

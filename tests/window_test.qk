@@ -514,3 +514,18 @@ define test_borderless_hit_areas() -> void {
     test.assert_eq(plain.hit_at(10, 10), "")
     plain.close()
 }
+
+// v1.10.0: Caps Lock in key events and asked at any time.
+define test_caps_lock() -> void {
+    e := window._event([2, 0, 0, 0, 16 + 1, "a"])
+    test.assert_true(e.caps)
+    test.assert_true(e.shift)
+    test.assert_false(e.ctrl)
+    f := window._event([2, 0, 0, 0, 0, "a"])
+    test.assert_false(f.caps)
+    if not window.available() { return }
+    w := window.open("caps", 100, 80, headless=true)
+    on := window.caps_lock()                         // (whatever the keyboard says: a Bool, no crash)
+    test.assert_true(on or not on)
+    w.close()
+}
