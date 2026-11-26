@@ -541,3 +541,28 @@ define test_set_icon() -> void {
     test.assert_true(w.set_icon(icon))
     w.close()
 }
+
+// ───── 1.12.0: the mouse's modifiers, the pointer ─────
+define test_mouse_events_say_modifiers() -> void {
+    e := window._event([6, 10, 20, 1, 1, "", 2])            // mouse_down with Ctrl
+    test.assert_eq(e.kind, "mouse_down")
+    test.assert_true(e.ctrl)
+    test.assert_false(e.shift or e.alt or e.meta)
+    m := window._event([5, 3, 4, 0, 0, "", 5])              // mouse_move with Shift+Alt
+    test.assert_true(m.shift and m.alt and not m.ctrl)
+    w := window._event([8, 0, -1, 0, 0, "", 8])             // wheel with Meta
+    test.assert_true(w.meta)
+    old := window._event([6, 10, 20, 1, 1, ""])             // (a compiler before 7.79.0)
+    test.assert_false(old.ctrl)
+}
+
+define test_pointer() -> void {
+    if not window.available() { return }
+    win := window.open("pointer", 100, 80, headless=true)
+    test.assert_eq(win.pointer(), "arrow")
+    win.set_pointer("hand")                                 // (headless: nothing on screen)
+    test.assert_eq(win.pointer(), "hand")
+    test.assert_false(win.set_pointer("spinner"))
+    test.assert_eq(win.pointer(), "hand")
+    win.close()
+}

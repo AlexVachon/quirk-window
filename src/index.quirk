@@ -237,6 +237,8 @@ Something that happened to a window. `kind` is one of:
   "mouse_down" / "mouse_up" — `x`, `y`, `button` (1 left, 2 middle,
                   3 right), `clicks` (2 for a double click)
   "wheel"       — `dx`, `dy` (positive = away from you / right)
+                  The mouse's events also say which of `shift` / `ctrl` /
+                  `alt` / `meta` were held (Shift+click, Ctrl+click).
   "resize"      — new `width`, `height`
   "focus" / "blur" — the window gained / lost keyboard focus
 ---
@@ -308,8 +310,16 @@ define _event(raw: List) -> Event {
     c: Int = raw[3]
     d: Int = raw[4]
     txt: String = raw[5]
+    mods := 0
+    if raw.length() > 6 { mods = raw[6] }          // (a compiler before 7.79.0 doesn't say)
     kind: String = _KINDS[k]
     e := Event(kind)
+    if kind == "mouse_move" or kind == "mouse_down" or kind == "mouse_up" or kind == "wheel" {
+        e.shift = mods % 2 == 1
+        e.ctrl = (mods / 2) % 2 == 1
+        e.alt = (mods / 4) % 2 == 1
+        e.meta = (mods / 8) % 2 == 1
+    }
     if kind == "key_down" or kind == "key_up" {
         e.key = txt
         e.repeat = b != 0
@@ -488,6 +498,9 @@ struct Image {
 }
 
 // ===== Windows =====
+// The pointers by SDL's system cursor number.
+_POINTERS: List = ["arrow", "text", "wait", "crosshair", "progress", "resize_nwse", "resize_nesw", "resize_ew", "resize_ns", "move", "not_allowed", "hand"]
+
 
 ---
 An open window (from `window.open`). Draw into it, then `present()` to
@@ -504,6 +517,7 @@ struct Window {
     _my: Int
     _keys: Map
     _ime: List
+    _pointer: String
 
     define __init(self, h: Int, title: String) -> void {
         self._h = h
@@ -513,6 +527,7 @@ struct Window {
         self._my = 0
         self._keys = {}
         self._ime = []
+        self._pointer = "arrow"
     }
 
     --- True until the window is closed (by `close()` or its close button). ---
@@ -858,6 +873,30 @@ struct Window {
         return set_icon_raw(self._h, path) == 1
     }
 
+    ---
+    The mouse pointer's shape over the window: "arrow", "text" (an I-beam),
+    "hand" (a link), "wait", "progress", "crosshair", "move",
+    "not_allowed", "resize_ew" / "resize_ns" / "resize_nwse" /
+    "resize_nesw". `pointer()` says the last one asked for (headless too,
+    where nothing changes on screen). False for an unknown name, or where
+    the system's pointers can't be set (headless).
+    ---
+    define set_pointer(self, name: String) -> Bool {
+        id := -1
+        i := 0
+        while i < _POINTERS.length() {
+            if String(_POINTERS[i]) == name { id = i }
+            i = i + 1
+        }
+        if id < 0 { return false }
+        self._pointer = name
+        return set_pointer_raw(id) == 1
+    }
+
+    define pointer(self) -> String {
+        return self._pointer
+    }
+
     define screenshot(self, path: String) -> void {
         if save_bmp_raw(self._h, path) != 0 { throw WindowError("window: can't save '" + path + "': " + error()) }
     }
@@ -924,6 +963,7 @@ define run(w: Window, frame: Callable, fps: Int = 60) -> void {
 
 extern define caps_lock_raw() -> Int
 extern define set_icon_raw(h: Int, path: String) -> Int
+extern define set_pointer_raw(id: Int) -> Int
 
 ---
 True while Caps Lock is on, as the window system sees it (asked now, not

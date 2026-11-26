@@ -41,10 +41,11 @@ window.run(window.open("Follow the mouse", 800, 600), frame)
 | | |
 |---|---|
 | `window.open(title, w, h, resizable=, hidden=, vsync=, headless=)` | A new `Window` (throws `WindowError` if it can't) |
-| `w.events()` / `w.wait_event(timeout_ms)` | `Event`s: `kind` = `close`, `key_down` / `key_up` (`key`, `shift`, `ctrl`...), `text`, `mouse_move` / `mouse_down` / `mouse_up` (`x`, `y`, `button`), `wheel`, `resize`, `focus`, `blur`, `compose` (an input method composing: `text`, `cursor`, `length`) |
+| `w.events()` / `w.wait_event(timeout_ms)` | `Event`s: `kind` = `close`, `key_down` / `key_up` (`key`, `shift`, `ctrl`...), `text`, `mouse_move` / `mouse_down` / `mouse_up` (`x`, `y`, `button`; `shift` / `ctrl` / `alt` / `meta` held), `wheel`, `resize`, `focus`, `blur`, `compose` (an input method composing: `text`, `cursor`, `length`) |
 | `w.clear`, `rect`, `line`, `point`, `circle`, `text`, `image` | Drawing; `present()` shows the frame. `image(img, x, y, width=, height=, src_x=, src_y=, src_w=, src_h=, alpha=)` scales, crops (sprite sheets) and fades |
 | `w.load_image(path)` | An `Image` from PNG (with transparency), JPEG, BMP, GIF (first frame) or TGA |
 | `w.width()`, `height()`, `mouse()`, `key_down(name)`, `set_title`, `close`, `is_open` | Window state |
+| `w.set_pointer(name)`, `pointer()` | The mouse pointer: `arrow`, `text` (I-beam), `hand`, `wait`, `progress`, `crosshair`, `move`, `not_allowed`, `resize_ew` / `resize_ns` / `resize_nwse` / `resize_nesw` |
 | `w.clip(x, y, width, height)`, `w.unclip()` | Only draw inside a rectangle (scrolling areas, panels) |
 | `window.clipboard()`, `window.set_clipboard(text)` | Copy and paste through the system clipboard |
 | `window.load_font(path, size, fallback=true)` → `Font` | A TrueType / OpenType font; `w.text(..., font=f)`, `f.width(text)`, `f.ascent`, `f.descent`, `f.line_height`, `f.covers(text)`. UTF-8 text: characters the font lacks (CJK, Hangul, Arabic, Hebrew, Thai...) come from installed system fonts, or ones you add with `f.add_fallback(path)` |
